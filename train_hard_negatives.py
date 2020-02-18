@@ -27,10 +27,10 @@ if __name__ == '__main__':
     @tf.function
     def train_step(positives, negatives, anchors):
         with tf.GradientTape() as tape:
-            loss = embedding_model(positives, negatives, anchors, config['margin'])
+            embeddings, loss = embedding_model(positives, negatives, anchors, config['margin'])
         gradients = tape.gradient(loss, embedding_model.trainable_variables)
         optimizer.apply_gradients(zip(gradients, embedding_model.trainable_variables))
-        return loss
+        return embeddings, loss
 
     batch_size = config['batch_size']
     batches = [train_samples[i * batch_size:(i + 1) * batch_size] for i in
@@ -40,5 +40,5 @@ if __name__ == '__main__':
             tokens = np.asarray([sample.sentence_tokens for sample in batch])
             negative_tokens = np.asarray([sample.negative_tokens for sample in batch])
             anchor_embeddings = np.asarray([sample.entity_embedding for sample in batch])
-            loss = train_step(tokens, negative_tokens, anchor_embeddings)
+            embeddings, loss = train_step(tokens, negative_tokens, anchor_embeddings)
             print(loss)

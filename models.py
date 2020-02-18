@@ -22,4 +22,4 @@ class TripletEmbedder(Model):
         min_distances = tf.math.reduce_min(distances, axis=1)
         positive_distances = tf.sqrt(tf.reduce_sum(tf.square(anchors - emb1), 1))
         loss = tf.reduce_mean(tf.maximum(0., margin + positive_distances - min_distances))
-        return loss
+        return emb1, loss
