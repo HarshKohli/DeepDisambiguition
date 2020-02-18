@@ -6,7 +6,7 @@ import tensorflow as tf
 import numpy as np
 from models import TripletEmbedder
 from utils.ioutils import read_train_inputs
-from utils.tf_utils import initialize_embeddings
+from utils.tf_utils import initialize_embeddings_from_canonical, initialize_embeddings_from_average_representations
 
 tf.config.experimental_run_functions_eagerly(True)
 
@@ -17,17 +17,20 @@ if __name__ == '__main__':
     train_samples, unique_entity_map = read_train_inputs(config['train_file'], config['negatives_delimiter'],
                                                          config['max_len'], config['max_negative_samples'])
     print('Initializing Embedding Matrix...')
-    initialize_embeddings(config, unique_entity_map, train_samples)
+    if config['initialization_strategy'] == 'average_rep':
+        initialize_embeddings_from_average_representations(config, unique_entity_map, train_samples)
+    elif config['initialization_strategy'] == 'from_canonical':
+        initialize_embeddings_from_canonical(config, unique_entity_map, train_samples)
 
     print('starting training')
     embedding_model = TripletEmbedder()
-    optimizer = tf.keras.optimizers.Adam()
+    optimizer = tf.keras.optimizers.Adam(learning_rate=3e-5, epsilon=1e-08, clipnorm=1.0)
 
 
     @tf.function
-    def train_step(positives, negatives, anchors):
+    def train_step(positives, negatives, anchors, masks, negative_masks):
         with tf.GradientTape() as tape:
-            embeddings, loss = embedding_model(positives, negatives, anchors, config['margin'])
+            embeddings, loss = embedding_model(positives, negatives, anchors, config['margin'], masks, negative_masks)
         gradients = tape.gradient(loss, embedding_model.trainable_variables)
         optimizer.apply_gradients(zip(gradients, embedding_model.trainable_variables))
         return embeddings, loss
@@ -38,7 +41,9 @@ if __name__ == '__main__':
     for epoch_num in range(config['num_epochs']):
         for batch_num, batch in enumerate(batches):
             tokens = np.asarray([sample.sentence_tokens for sample in batch])
+            masks = np.asarray([sample.sentence_attention_mask for sample in batch])
             negative_tokens = np.asarray([sample.negative_tokens for sample in batch])
+            negative_masks = np.asarray([sample.negative_attention_masks for sample in batch])
             anchor_embeddings = np.asarray([sample.entity_embedding for sample in batch])
-            embeddings, loss = train_step(tokens, negative_tokens, anchor_embeddings)
+            embeddings, loss = train_step(tokens, negative_tokens, anchor_embeddings, masks, negative_masks)
             print(loss)

@@ -2,6 +2,7 @@
 # Date created: 2/15/2020
 
 import tensorflow as tf
+import numpy as np
 from transformers import TFAlbertModel
 from tensorflow.keras import Model
 
@@ -11,11 +12,13 @@ class TripletEmbedder(Model):
         super(TripletEmbedder, self).__init__()
         self.albert_embedder = TFAlbertModel.from_pretrained('albert-base-v2')
 
-    def call(self, positives, negatives, anchors, margin):
+    def call(self, positives, negatives, anchors, margin, masks, negative_masks):
+        emb1 = tf.reduce_mean(self.albert_embedder(positives, attention_mask=np.array(masks))[0], axis=1)
         emb1 = self.albert_embedder(positives)[1]
         negatives_shape = tf.shape(negatives)
         negatives_flattened = tf.reshape(negatives, shape=(negatives_shape[0] * negatives_shape[1], -1))
-        emb2 = self.albert_embedder(negatives_flattened)[1]
+        negative_masks_flattened = tf.reshape(negative_masks, shape=(negatives_shape[0] * negatives_shape[1], -1))
+        emb2 = self.albert_embedder(negatives_flattened, attention_mask=np.array(negative_masks_flattened))[1]
         emb2 = tf.reshape(emb2, shape=(negatives_shape[0], negatives_shape[1], -1))
         broadcasted_anchors = tf.broadcast_to(tf.expand_dims(anchors, 1), shape=tf.shape(emb2))
         distances = tf.sqrt(tf.reduce_sum(tf.square(broadcasted_anchors - emb2), 2))
