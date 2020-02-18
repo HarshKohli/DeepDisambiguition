@@ -3,5 +3,7 @@ dev_file: data/dev.tsv
 negatives_delimiter: $@#
 embedding_batch_size: 32
 max_len: 32
-batch_size: 2
+batch_size: 16
 num_epochs: 5
+max_negative_samples: 15
+margin: 0.2
