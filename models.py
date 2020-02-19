@@ -14,7 +14,6 @@ class TripletEmbedder(Model):
 
     def call(self, positives, negatives, anchors, margin, masks, negative_masks):
         emb1 = tf.reduce_mean(self.albert_embedder(positives, attention_mask=np.array(masks))[0], axis=1)
-        emb1 = self.albert_embedder(positives)[1]
         negatives_shape = tf.shape(negatives)
         negatives_flattened = tf.reshape(negatives, shape=(negatives_shape[0] * negatives_shape[1], -1))
         negative_masks_flattened = tf.reshape(negative_masks, shape=(negatives_shape[0] * negatives_shape[1], -1))

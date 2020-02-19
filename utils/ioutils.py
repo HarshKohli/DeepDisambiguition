@@ -1,7 +1,6 @@
 # Author: Harsh Kohli
 # Date created: 1/12/2020
 
-import tensorflow as tf
 from transformers import AlbertTokenizer
 from utils.entity_obj import EntityObj
 from utils.train_sample import TrainSample
