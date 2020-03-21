@@ -9,9 +9,9 @@ import numpy as np
 
 
 # Assumes schema - query entity_id cononical_name negative_samples
-def read_train_inputs(train_file, delimiter, max_len, max_negatives):
+def read_train_inputs(train_file, delimiter, max_len, max_negatives, num_dev_samples):
     f = open(train_file, 'r', encoding='utf8')
-    unique_entity_map, train_samples = {}, []
+    unique_entity_map, all_samples = {}, []
     tokenizer = AlbertTokenizer.from_pretrained('albert-base-v2')
     for line in f.readlines():
         info = line.strip().split('\t')
@@ -30,7 +30,7 @@ def read_train_inputs(train_file, delimiter, max_len, max_negatives):
             negative_attention_masks.append(np.array(negative_token_info['attention_mask']))
         train_sample = TrainSample(sentence, entity_id, negative_samples, sentence_tokens, negative_tokens,
                                    sentence_attention_mask, negative_attention_masks)
-        train_samples.append(train_sample)
+        all_samples.append(train_sample)
         if entity_id not in unique_entity_map:
             entity_token_info = tokenizer.encode_plus(canonical_name, max_length=max_len, pad_to_max_length=True)
             new_entity = EntityObj(entity_id, canonical_name, entity_token_info['input_ids'],
@@ -41,5 +41,7 @@ def read_train_inputs(train_file, delimiter, max_len, max_negatives):
         else:
             unique_entity_map[entity_id].utterances.append(sentence_tokens)
             unique_entity_map[entity_id].masks.append(sentence_attention_mask)
-    random.shuffle(train_samples)
-    return train_samples, unique_entity_map
+    random.shuffle(all_samples)
+    train_samples, dev_samples = all_samples[:len(all_samples) - num_dev_samples], all_samples[len(
+        all_samples) - num_dev_samples:]
+    return train_samples, dev_samples, unique_entity_map
