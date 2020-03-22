@@ -1,12 +1,12 @@
 train_file: data/train.tsv
 dev_file: data/dev.tsv
 negatives_delimiter: $@#
-embedding_batch_size: 32
+embedding_batch_size: 64
 max_len: 16
-batch_size: 16
+batch_size: 64
 num_epochs: 10
 max_negative_samples: 15
 margin: 100.0
-initialization_strategy: from_canonical
+initialization_strategy: average_rep
 num_dev_samples: 20
 find_p: [1,2,3]

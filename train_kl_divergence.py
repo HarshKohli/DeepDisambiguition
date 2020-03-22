@@ -1,5 +1,5 @@
 # Author: Harsh Kohli
-# Date created: 1/12/2020
+# Date created: 3/22/2020
 
 import yaml
 import tensorflow as tf
@@ -9,6 +9,7 @@ from models import AlbertEmbedder
 from utils.ioutils import read_train_inputs
 from utils.tf_utils import initialize_embeddings_from_canonical, initialize_embeddings_from_average_representations
 from utils.metrics import get_p, get_mrr
+from tensorflow.keras.losses import KLDivergence
 
 tf.config.experimental_run_functions_eagerly(True)
 
@@ -31,22 +32,13 @@ if __name__ == '__main__':
     print('starting training')
     embedding_model = AlbertEmbedder()
     optimizer = tf.keras.optimizers.Adam(learning_rate=3e-5, epsilon=1e-08, clipnorm=1.0)
-
+    loss_obj = KLDivergence()
 
     @tf.function
-    def train_step(positives, negatives, anchors, masks, negative_masks):
+    def train_step(tokens, masks, anchor_embeddings):
         with tf.GradientTape() as tape:
-            emb1 = embedding_model(positives, masks, training=True)
-            negatives_shape = tf.shape(negatives)
-            negatives_flattened = tf.reshape(negatives, shape=(negatives_shape[0] * negatives_shape[1], -1))
-            negative_masks_flattened = tf.reshape(negative_masks, shape=(negatives_shape[0] * negatives_shape[1], -1))
-            emb2 = embedding_model(negatives_flattened, negative_masks_flattened, training=True)
-            emb2 = tf.reshape(emb2, shape=(negatives_shape[0], negatives_shape[1], -1))
-            broadcasted_anchors = tf.broadcast_to(tf.expand_dims(anchors, 1), shape=tf.shape(emb2))
-            distances = tf.sqrt(tf.reduce_sum(tf.square(broadcasted_anchors - emb2), 2))
-            min_distances = tf.math.reduce_min(distances, axis=1)
-            positive_distances = tf.sqrt(tf.reduce_sum(tf.square(anchors - emb1), 1))
-            loss = tf.reduce_mean(tf.maximum(0., config['margin'] + positive_distances - min_distances))
+            emb1 = embedding_model(tokens, masks, training=True)
+            loss = loss_obj(emb1, anchor_embeddings)
         gradients = tape.gradient(loss, embedding_model.trainable_variables)
         optimizer.apply_gradients(zip(gradients, embedding_model.trainable_variables))
         return emb1, loss
@@ -66,10 +58,8 @@ if __name__ == '__main__':
         for batch_num, batch in enumerate(batches):
             tokens = np.asarray([sample.sentence_tokens for sample in batch])
             masks = np.asarray([sample.sentence_attention_mask for sample in batch])
-            negative_tokens = np.asarray([sample.negative_tokens for sample in batch])
-            negative_masks = np.asarray([sample.negative_attention_masks for sample in batch])
             anchor_embeddings = np.asarray([sample.entity_embedding for sample in batch])
-            embeddings, loss = train_step(tokens, negative_tokens, anchor_embeddings, masks, negative_masks)
+            embeddings, loss = train_step(tokens, masks, anchor_embeddings)
             print(loss)
         print('Running dev set after ' + str(epoch_num + 1) + ' epochs')
         labels, ranks = [], []
