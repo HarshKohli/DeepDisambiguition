@@ -8,6 +8,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from models import AlbertEmbedder
 from utils.ioutils import read_train_inputs
 from utils.tf_utils import initialize_embeddings_from_canonical, initialize_embeddings_from_average_representations
+from utils.metrics import get_p
 
 tf.config.experimental_run_functions_eagerly(True)
 
@@ -71,7 +72,14 @@ if __name__ == '__main__':
             embeddings, loss = train_step(tokens, negative_tokens, anchor_embeddings, masks, negative_masks)
             print(loss)
         print('Running dev set after ' + str(epoch_num + 1) + ' epochs')
+        labels, ranks = [], []
         for batch_num, batch in enumerate(batches):
             tokens = np.asarray([sample.sentence_tokens for sample in batch])
             masks = np.asarray([sample.sentence_attention_mask for sample in batch])
             embeddings = dev_step(tokens, masks)
+            similarities = cosine_similarity(embeddings, embedding_matrix)
+            ranks.extend(np.argsort(similarities))
+            labels.extend([eid_to_index[x.entity_id] for x in batch])
+        p_to_value = get_p(config, labels, ranks)
+        for p, value in p_to_value.items(): \
+                print('P@' + str(p) + ' is ' + str(value))
