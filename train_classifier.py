@@ -4,12 +4,11 @@
 import yaml
 import tensorflow as tf
 import numpy as np
-from sklearn.metrics.pairwise import cosine_similarity
-from models import AlbertEmbedder
+from tensorflow.keras.losses import CategoricalCrossentropy
+from models import AlbertPlusOutputLayer
 from utils.ioutils import read_train_inputs
 from utils.tf_utils import initialize_embeddings_from_canonical, initialize_embeddings_from_average_representations
 from utils.metrics import get_p, get_mrr
-from tensorflow.keras.losses import KLDivergence
 
 tf.config.experimental_run_functions_eagerly(True)
 
@@ -30,24 +29,25 @@ if __name__ == '__main__':
                                                                                             train_samples)
 
     print('starting training')
-    embedding_model = AlbertEmbedder()
-    optimizer = tf.keras.optimizers.Adam(learning_rate=3e-5, epsilon=1e-08, clipnorm=1.0)
-    loss_obj = KLDivergence()
+    nb_classes = len(unique_entity_map)
+    model = AlbertPlusOutputLayer(nb_classes)
+    loss_obj = CategoricalCrossentropy()
+    optimizer = tf.keras.optimizers.Adam(learning_rate=3e-5, epsilon=1e-08)
 
 
     @tf.function
-    def train_step(tokens, masks, anchor_embeddings):
+    def train_step(tokens, masks, one_hot_labels):
         with tf.GradientTape() as tape:
-            emb1 = embedding_model([tokens, masks], training=True)
-            loss = loss_obj(emb1, anchor_embeddings)
-        gradients = tape.gradient(loss, embedding_model.trainable_variables)
-        optimizer.apply_gradients(zip(gradients, embedding_model.trainable_variables))
-        return emb1, loss
+            logits = model([tokens, masks], training=True)
+            loss = loss_obj(y_true=one_hot_labels, y_pred=logits)
+        gradients = tape.gradient(loss, model.trainable_variables)
+        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+        return logits, loss
 
 
     @tf.function
     def dev_step(tokens, masks):
-        return embedding_model([tokens, masks], training=False)
+        return model([tokens, masks], training=False)
 
 
     batch_size = config['batch_size']
@@ -55,21 +55,22 @@ if __name__ == '__main__':
                range((len(train_samples) + batch_size - 1) // batch_size)]
     dev_batches = [dev_samples[i * batch_size:(i + 1) * batch_size] for i in
                    range((len(dev_samples) + batch_size - 1) // batch_size)]
+
     for epoch_num in range(config['num_epochs']):
         for batch_num, batch in enumerate(batches):
             tokens = np.asarray([sample.sentence_tokens for sample in batch])
             masks = np.asarray([sample.sentence_attention_mask for sample in batch])
-            anchor_embeddings = np.asarray([sample.entity_embedding for sample in batch])
-            embeddings, loss = train_step(tokens, masks, anchor_embeddings)
+            targets = np.asarray([eid_to_index[sample.entity_id] for sample in batch])
+            one_hot_labels = np.eye(nb_classes)[targets]
+            probabilites, loss = train_step(tokens, masks, one_hot_labels)
             print(loss)
         print('Running dev set after ' + str(epoch_num + 1) + ' epochs')
         labels, ranks = [], []
         for batch_num, batch in enumerate(dev_batches):
             tokens = np.asarray([sample.sentence_tokens for sample in batch])
             masks = np.asarray([sample.sentence_attention_mask for sample in batch])
-            embeddings = dev_step(tokens, masks)
-            similarities = cosine_similarity(embeddings, embedding_matrix)
-            ranks.extend(np.argsort(similarities))
+            logits = dev_step(tokens, masks)
+            ranks.extend(np.argsort(logits))
             labels.extend([eid_to_index[x.entity_id] for x in batch])
         p_to_value, mrr = get_p(config, labels, ranks), get_mrr(labels, ranks)
         for p, value in p_to_value.items():

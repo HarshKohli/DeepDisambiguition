@@ -2,8 +2,8 @@
 # Date created: 1/12/2020
 
 from transformers import AlbertTokenizer
-from utils.entity_obj import EntityObj
-from utils.train_sample import TrainSample
+from data_classes.entity_obj import EntityObj
+from data_classes.train_sample import TrainSample
 import random
 import numpy as np
 

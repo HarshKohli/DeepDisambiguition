@@ -17,5 +17,5 @@ def get_mrr(labels, ranks):
     num_samples = len(labels)
     rank_sum = 0
     for label, rank in zip(labels, ranks):
-        rank_sum = 1/(rank_sum + rank[label] + 1)
+        rank_sum = 1 / (rank_sum + rank[label] + 1)
     return rank_sum / num_samples

@@ -36,11 +36,11 @@ if __name__ == '__main__':
     @tf.function
     def train_step(positives, negatives, anchors, masks, negative_masks):
         with tf.GradientTape() as tape:
-            emb1 = embedding_model(positives, masks, training=True)
+            emb1 = embedding_model([positives, masks], training=True)
             negatives_shape = tf.shape(negatives)
             negatives_flattened = tf.reshape(negatives, shape=(negatives_shape[0] * negatives_shape[1], -1))
             negative_masks_flattened = tf.reshape(negative_masks, shape=(negatives_shape[0] * negatives_shape[1], -1))
-            emb2 = embedding_model(negatives_flattened, negative_masks_flattened, training=True)
+            emb2 = embedding_model([negatives_flattened, negative_masks_flattened], training=True)
             emb2 = tf.reshape(emb2, shape=(negatives_shape[0], negatives_shape[1], -1))
             broadcasted_anchors = tf.broadcast_to(tf.expand_dims(anchors, 1), shape=tf.shape(emb2))
             distances = tf.sqrt(tf.reduce_sum(tf.square(broadcasted_anchors - emb2), 2))
@@ -54,7 +54,7 @@ if __name__ == '__main__':
 
     @tf.function
     def dev_step(tokens, masks):
-        return embedding_model(tokens, masks, training=False)
+        return embedding_model([tokens, masks], training=False)
 
 
     batch_size = config['batch_size']
@@ -82,5 +82,5 @@ if __name__ == '__main__':
             labels.extend([eid_to_index[x.entity_id] for x in batch])
         p_to_value, mrr = get_p(config, labels, ranks), get_mrr(labels, ranks)
         for p, value in p_to_value.items():
-                print('P@' + str(p) + ' is ' + str(value))
+            print('P@' + str(p) + ' is ' + str(value))
         print('MRR is ' + str(mrr))
