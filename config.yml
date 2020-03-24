@@ -4,9 +4,10 @@ negatives_delimiter: $@#
 embedding_batch_size: 8
 max_len: 16
 batch_size: 8
-num_epochs: 10
+num_epochs: 2
 max_negative_samples: 15
 margin: 100.0
 initialization_strategy: average_rep
 num_dev_samples: 20
 find_p: [1,2,3]
+log_dir: logs/

@@ -4,6 +4,7 @@
 import yaml
 import tensorflow as tf
 import numpy as np
+import os
 from sklearn.metrics.pairwise import cosine_similarity
 from models import AlbertEmbedder
 from utils.ioutils import read_train_inputs
@@ -50,6 +51,13 @@ if __name__ == '__main__':
         return embedding_model([tokens, masks], training=False)
 
 
+    logfile = open(os.path.join(config['log_dir'], 'hard_negtive_logs.tsv'), 'w', encoding='utf8')
+
+    logfile.write('Epoch' + '\t')
+    for p in config['find_p']:
+        logfile.write('P@' + str(p) + '\t')
+    logfile.write('MRR\n')
+
     batch_size = config['batch_size']
     batches = [train_samples[i * batch_size:(i + 1) * batch_size] for i in
                range((len(train_samples) + batch_size - 1) // batch_size)]
@@ -72,6 +80,11 @@ if __name__ == '__main__':
             ranks.extend(np.argsort(similarities))
             labels.extend([eid_to_index[x.entity_id] for x in batch])
         p_to_value, mrr = get_p(config, labels, ranks), get_mrr(labels, ranks)
+        logfile.write(str(epoch_num + 1) + '\t')
         for p, value in p_to_value.items():
             print('P@' + str(p) + ' is ' + str(value))
+            logfile.write(str(value) + '\t')
         print('MRR is ' + str(mrr))
+        logfile.write(str(mrr) + '\n')
+
+    logfile.close()
